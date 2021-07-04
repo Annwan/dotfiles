@@ -35,16 +35,6 @@ Display line and column number in modeline
 (column-number-mode t)
 #+end_src
 
-** Custom declarations file
-
-I dont like emacs poluting my (mostly empty) =init.el=.
-So I let it polute in its own dedicated file.
-   
-#+begin_src elisp
-(setq custom-file "~/.emacs.d/custom.el")
-(load-file custom-file)
-#+end_src
-
 ** Tabs are evil
 
 See [[https://www.emacswiki.org/emacs/TabsAreEvil][Emacs Wiki]]
