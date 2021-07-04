@@ -1,0 +1,205 @@
+#+TITLE: My emacs config
+#+AUTHOR: Annwan
+
+* Basic tweaks that maybe should have been defaults
+
+** The tutorial
+
+I only need to see the tutorial once.
+#+begin_src elisp
+(setq inhibit-startup-message t)
+#+end_src
+
+** GUI widgets
+
+Yeah, those only take room and the screen without beeing of any use, lets remove them.
+
+#+begin_src elisp
+(tool-bar-mode -1)
+(menu-bar-mode -1)
+(scroll-bar-mode -1)
+#+end_src
+   
+** Display some more stuff
+
+Highlight current line
+
+#+begin_src elisp
+(global-hl-line-mode t)
+#+end_src
+
+Display line and column number in modeline
+   
+#+begin_src elisp
+(line-number-mode t)
+(column-number-mode t)
+#+end_src
+
+** Custom declarations file
+
+I dont like emacs poluting my (mostly empty) =init.el=.
+So I let it polute in its own dedicated file.
+   
+#+begin_src elisp
+(setq custom-file "~/.emacs.d/custom.el")
+(load-file custom-file)
+#+end_src
+
+** Tabs are evil
+
+See [[https://www.emacswiki.org/emacs/TabsAreEvil][Emacs Wiki]]
+
+#+begin_src elisp
+(setq-default indent-tabs-mode nil)
+#+end_src
+
+* Configuring builtin stuff
+
+** Org mode
+
+Indentation messes code blocks
+
+#+begin_src elisp
+(setq org-adapt-indentation nil)
+(setq org-edit-src-content-indentation 0)
+#+end_src
+
+** Fonts
+
+Using the nerd font patched Source Code Pro.
+   
+#+begin_src elisp
+(add-to-list 'default-frame-alist '(font . "SauceCodePro Nerd Font-12"))
+#+end_src
+   
+** =prettify-symbols=
+
+We want to enable it everywhere
+   
+#+begin_src elisp
+(global-prettify-symbols-mode +1)
+#+end_src
+
+Now configuration mode per mode
+
+*** Org
+
+For org mode we want the following:
+   
+- replace the series of =*= with bullets
+- replace =#+begin_src=, =#+begin_quote=, =#+begin_example= and their corresponding end tags with more estheticaly pleasing symbols
+- replace some of the other =#+...= tags with descriptive characters
+      
+#+begin_src elisp
+(add-hook 'org-mode-hook
+ (lambda ()
+  (push '("#+TITLE:" . ?“) prettify-symbols-alist)
+  (push '("#+title:" . ?“) prettify-symbols-alist)
+  (push '("#+AUTHOR:" . ?…) prettify-symbols-alist)
+  (push '("#+author:" . ?…) prettify-symbols-alist)
+  (push '("#+begin_src" . ?↓) prettify-symbols-alist)
+  (push '("#+end_src" . ?↑) prettify-symbols-alist)
+  (push '("#+begin_example" . ?‹) prettify-symbols-alist)
+  (push '("#+end_example" . ?›) prettify-symbols-alist)
+  (push '("#+begin_quote" . ?«) prettify-symbols-alist)
+  (push '("#+end_quote" . ?») prettify-symbols-alist)
+  (push '("*" . ?●) prettify-symbols-alist)
+  (push '("**" . ?◉) prettify-symbols-alist)
+  (push '("***" . ?○) prettify-symbols-alist)))
+#+end_src
+
+*** Haskell
+
+We will replace sevral of the multi-characters operators and keywords
+
+#+begin_src elisp
+(add-hook 'haskell-mode-hook
+ (lambda ()
+  (push '("/=" . ?≠) prettify-symbols-alist)
+  (push '("::" . ?⸬) prettify-symbols-alist)
+  (push '("\\" . ?λ) prettify-symbols-alist)
+  (push '("=>" . ?⇒) prettify-symbols-alist)
+  (push '("->" . ?→) prettify-symbols-alist)))
+#+end_src
+    
+* Setup use for packages
+
+** Require and initialize the package module
+
+Without it we can't do anything
+
+#+begin_src elisp
+(require 'package)
+(package-initialize)
+#+end_src
+
+** Add MELPA to the archive list
+
+GNU ELPA is nice but clearly does not have everything we need
+
+#+begin_src elisp
+(add-to-list 'package-archives
+ '("melpa" . "https://melpa.org/packages/") t)
+#+end_src
+
+** =use-package=
+
+This is a package that will allow us to more easily manage other packages
+   
+#+begin_src elisp
+(unless (package-installed-p 'use-package)
+ (package-refresh-contents)
+ (package-install 'use-package))
+#+end_src
+
+* External Packages and their configuration
+** Theme
+
+I use =doom-monokai-spectrum= from the =doom-themes= package
+
+#+begin_src elisp
+(use-package doom-themes
+ :ensure t
+ :config
+ (load-theme 'doom-monokai-spectrum))
+ #+end_src
+** Autocompletion in mini-buffers
+   For this task I use =ivy= and =counsel=
+
+#+begin_src elisp
+(use-package counsel
+ :ensure t
+ :config
+ (counsel-mode))
+#+end_src
+   
+** Autocompletion in files
+
+=company= is the best auto completion package currently available.
+    
+#+begin_src elisp
+(use-package company
+ :ensure t
+ :config
+ (global-company-mode))
+#+end_src
+
+** Git support
+
+=magit= rules.
+
+#+begin_src elisp
+(use-package magit
+ :ensure t
+ :bind ("C-x g" . magit-status))
+#+end_src
+
+** Haskell
+
+#+begin_src elisp
+(use-package haskell-mode
+ :bind
+ (:map haskell-mode-map
+  ("<f8>" . haskell-navigate-imports))
+ :ensure t)
+#+end_src
