@@ -1,0 +1,201 @@
+#+title: Xmonad configuration
+#+PROPERTY: header-args :tangle "./xmonad.hs"
+
+* About this configuration
+
+This is Annwan's XMonad configuration. It is a mess, probably not specially
+good, but it works... most of the time.
+
+* Imports
+
+Here we import everything we are going to need. I try to keep them somewhat
+lexicographically sorted.
+ 
+#+begin_src haskell
+import           System.IO
+
+import           XMonad
+
+import           XMonad.Hooks.DynamicLog
+import           XMonad.Hooks.ManageDocks
+
+import           XMonad.Layout.LayoutModifier
+
+import qualified XMonad.StackSet          as W
+
+import           XMonad.Util.EZConfig     (additionalKeysP)
+import           XMonad.Util.Run          (spawnPipe)
+import           XMonad.Util.SpawnOnce
+#+end_src
+
+* Variables
+
+We are going to use those values multiple times so we assign them here and give
+them names we can use further on.
+
+#+begin_src haskell
+-- default font
+myFont :: String
+myFont = "xft:SauceCodePro Nerd Font:regular:size=12:antialias=true:hinting=true"
+
+-- modifier is super, not alt
+myModMask :: KeyMask
+myModMask = mod4Mask
+
+-- kitty is my terminal
+myTerminal :: String
+myTerminal = "kitty"
+  
+-- firefox is my browser
+myBrowser :: String
+myBrowser = "firefox"
+
+-- allows me to have a shorthand for emacs keybindings
+emacs :: String
+emacs = "emacsclient -c"
+
+-- editor
+myEditor :: String
+-- myEditor = myTerminal ++ " nvim" -- uncomment for neovim
+myEditor = emacs -- uncomment for emacs
+
+windowCount :: X (Maybe String)
+windowCount = gets
+            $ Just
+            . show
+            . length
+            . W.integrate'
+            . W.stack
+            . W.workspace
+            . W.current
+            . windowset
+
+#+end_src
+
+* Autostart (startup hook)
+
+This is what I want XMonad to run on startup. It includes the compositor the
+network manager, the systray, the volume icon, the emacs server and the
+wallpaper manager
+
+#+begin_src haskell
+myStartupHook :: X ()
+myStartupHook = do
+    spawnOnce "picom &"
+    spawnOnce "nm-applet &"
+    spawnOnce "volumeicon &"
+    spawnOnce $  "trayer --edge top --align right --widthtype request "
+           ++ "--padding 6 --SetDockType true --SetPartialStrut true "
+           ++ "--expand true --monitor 1 --transparent true --alpha 0 "
+           ++ "--tint 0x282828 --height 22 &"
+    spawnOnce "emacs --daemon &"
+#+end_src
+
+* Layouts
+
+Classic master and stack layout.
+
+#+begin_src haskell
+tall = Tall 1 0.03 0.5
+
+mtall = Mirror $ Tall 1 0.03 0.5
+#+end_src
+
+Fullscreen window
+
+#+begin_src haskell
+full = Full
+#+end_src
+
+And all of them put together, avoiding the status bar on the way
+
+#+begin_src haskell
+myLayoutHook = avoidStruts $ tall ||| mtall ||| full
+#+end_src
+
+* Workspaces
+
+All of them are named and numbered
+
+#+begin_src haskell
+wsNames = ["dev", "www", "sys", "doc", "chat", "mus", "gfx", "virt"]
+myWorkspaces = zipWith (\i n -> (show i) ++ ":" ++ n) [1..] wsNames
+#+end_src
+
+* ManageHook
+
+Set rules for certain programs, copied the one of the sample XMonad config so
+that I have something to put for it in the main
+
+#+begin_src haskell
+myManageHook = composeAll
+    [ className =? "MPlayer"        --> doFloat
+    , className =? "Gimp"           --> doFloat
+    , resource  =? "desktop_window" --> doIgnore
+    , resource  =? "kdesktop"       --> doIgnore ]
+#+end_src
+
+* Keybinds
+
+In the following table and code, =M= represents super (the modkey), =M1= is alt,
+=S= is shift and =C= is control.
+
+| *Some Keybinds* | *Action*                                                      |
+| =M-<return>=    | Spawns a terminal                                             |
+| =M-S-<return>=  | Spawns a launcher                                             |
+| =M-<space>=     | Rotates through layouts                                       |
+| =M-b=           | Togle struts, effectively hides the bar, for fullscreen stuff |
+| =M-1..9=        | Switch to workspace 1..9                                      |
+| =M-S-1..9=      | Move window to workspace 1..9                                 |
+| =M-j=           | Focus the next window in the stack                            |
+| =M-k=           | Focus the previous window in the stack                        |
+| =M-S-j=         | Move the window down in the stack                             |
+| =M-S-k=         | Move the window up in the stack                               |
+| =M-h=           | Shrink master window                                          |
+| =M-l=           | Expand master window                                          |
+| =M-w=           | Focus monitor 1                                               |
+| =M-e=           | Focus monitor 2                                               |
+| =M-t=           | Force a window back into tiling                               |
+| =M-z=           | Opens the editor                                              |
+| =M-n=           | Opens the web browser                                         |
+
+#+begin_src haskell
+myKeys :: [(String, X ())]
+myKeys =
+  [ ("M-S-<Return>", spawn "dmenu_run -i -p \"Run: \"")
+  , ("M-<Return>", spawn myTerminal)
+  , ("M-z", spawn myEditor)
+  , ("M-n", spawn myBrowser)
+  ]
+#+end_src
+
+* Main
+
+This is the main function, where everything come together and (hopefully) works.
+
+#+begin_src haskell
+main :: IO ()
+main = do
+  -- Lauch xmobar
+  xmproc <- spawnPipe "xmobar -x 0 ~/xmobarrc"
+
+  -- The X Monad, you know... what this whole mess is named after
+  xmonad $ def
+    { manageHook = myManageHook <+> manageDocks
+    , handleEventHook = docksEventHook
+    , modMask = myModMask
+    , terminal = myTerminal
+    , startupHook = myStartupHook
+    , layoutHook = myLayoutHook
+    , workspaces = myWorkspaces
+    , logHook = dynamicLogWithPP $ xmobarPP
+      { ppOutput = hPutStrLn xmproc
+      , ppCurrent = wrap "[" "]"
+      , ppVisible = wrap "(" ")"
+      , ppHidden = wrap "*" ""
+      , ppHiddenNoWindows = wrap "" ""
+      , ppTitle = shorten 60
+      , ppSep = " | "
+      }
+    } `additionalKeysP` myKeys
+#+end_src
