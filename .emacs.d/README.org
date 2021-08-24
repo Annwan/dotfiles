@@ -54,6 +54,14 @@ Indentation messes code blocks
 (setq org-edit-src-content-indentation 0)
 #+end_src
 
+** ElDoc
+
+Documentation for elisp
+
+#+begin_src elisp
+(add-hook 'emacs-lisp-mode-hook 'eldoc-mode)
+#+end_src
+
 ** Fonts
 
 Using the nerd font patched Source Code Pro.
@@ -192,4 +200,142 @@ I use =doom-monokai-spectrum= from the =doom-themes= package
  (:map haskell-mode-map
   ("<f8>" . haskell-navigate-imports))
  :ensure t)
+#+end_src
+
+** Projects
+
+=projectile= adds the notion of projects to emacs, which is really handy
+
+#+begin_src elisp
+(use-package projectile
+  :bind
+  (:map projectile-mode-map
+        ("C-c p" . projectile-command-map))
+  :init
+  (projectile-mode +1)
+  :ensure t)
+#+end_src
+
+** Keybinds popup
+
+Emacs has loads of keybinds, you end up remembering those you use often but
+=which-key= helps a lot when you have a doubt
+
+#+begin_src elisp
+(use-package which-key
+  :init
+  (which-key-mode +1)
+  (add-to-list 'which-key-replacement-alist '(("TAB" . nil) . ("⇥" . nil)))
+  (add-to-list 'which-key-replacement-alist '(("DEL" . nil) . ("⌫" . nil)))
+  (add-to-list 'which-key-replacement-alist '(("RET" . nil) . ("↵" . nil)))
+  (add-to-list 'which-key-replacement-alist '(("SPC" . nil) . ("␣" . nil)))  
+  :ensure t)
+#+end_src
+
+** Markdown support
+
+READMEs and more
+
+#+begin_src elisp
+(use-package markdown-mode
+  :ensure t
+  :commands (markdown-mode gfm-mode)
+  :mode (("README\\.md\\'" . gfm-mode)
+         ("\\.md\\'" . markdown-mode)
+         ("\\.markdown\\'" . markdown-mode))
+  :init (setq markdown-command "multimarkdown"))
+#+end_src
+
+** Edit indirect
+
+Edit code blocks of outline documents in a dedicated buffer
+
+#+begin_src elisp
+(use-package edit-indirect
+  :ensure t)
+#+end_src
+
+** Smart parenthesis
+
+Auto closing parens, brackets, braces and more
+
+#+begin_src elisp
+(use-package smartparens
+  :init
+  (smartparens-global-mode 1)
+  :ensure t)
+#+end_src
+
+** TeX
+
+*** PDF Preview
+
+#+begin_src elisp
+(use-package pdf-tools
+  :ensure t
+  :config
+  (pdf-tools-install)
+  (setq-default pdf-view-display-size 'fit-page)
+  (setq pdf-annot-activate-created-annotations t))
+#+end_src
+
+*** References and citatitons
+
+#+begin_src elisp
+(use-package reftex
+  :ensure t
+  :defer t
+  :config (setq reftex-cite-prompt-optional-args t))
+#+end_src
+
+*** Autocompletion
+
+#+begin_src elisp
+(use-package company-auctex
+  :ensure t
+  :init (company-auctex-init))
+#+end_src
+
+*** Building stuff
+
+#+begin_src elisp
+(use-package auctex-latexmk
+  :ensure t
+  :config
+  (auctex-latexmk-setup)
+  (setq auctex-latexmk-inherit-TeX-PDF-mode t))
+#+end_src
+
+*** Everything else
+
+#+begin_src elisp
+(use-package tex
+  :ensure auctex
+  :mode ("\\.tex\\'" . latex-mode)
+  :config (progn
+            (setq TeX-source-correlate-mode t)
+            (setq TeX-source-correlate-method 'synctex)
+            (setq TeX-auto-save t)
+            (setq TeX-parse-self t)
+            (setq reftex-plug-into-AUCTeX t)
+            (setq-default TeX-master "main.tex")
+            (pdf-tools-install)
+            (setq TeX-view-program-selection '((output-pdf "PDF Tools"))
+                  TeX-source-correlate-start-server t)
+            (add-hook 'TeX-after-compilation-finished-functions
+                      #'TeX-revert-document-buffer)
+            (add-hook 'LaTeX-mode-hook
+                      (lambda ()
+                        (reftex-mode t)))))
+#+end_src
+
+** Lua
+
+Lua developement. I do a whole bunch of that
+
+#+begin_src elisp
+(use-package lua-mode
+  :ensure t
+  :config
+  (setq lua-indent-level 4))
 #+end_src
