@@ -2,7 +2,6 @@
 #+AUTHOR: Annwan
 
 * Basic tweaks that maybe should have been defaults
-
 ** The tutorial
 
 I only need to see the tutorial once.
@@ -33,6 +32,7 @@ Display line and column number in modeline
 #+begin_src elisp
 (line-number-mode t)
 (column-number-mode t)
+(global-display-line-numbers-mode +1)
 #+end_src
 
 ** Tabs are evil
@@ -43,7 +43,45 @@ See [[https://www.emacswiki.org/emacs/TabsAreEvil][Emacs Wiki]]
 (setq-default indent-tabs-mode nil)
 #+end_src
 
+** Stop putting backups everywhere
+
+#+begin_src elisp
+(setq backup-directory-alist `(("." . "~/.emacs.d/backups"))
+      backup-by-copying t
+      delete-old-versions t
+      kept-new-versions 6
+      kept-old-versions 2
+      version-control t)
+#+end_src
+
+** Dired
+
+Less verbose, more readable dired listing
+
+#+begin_src elisp
+(add-hook 'dired-mode-hook
+          (lambda ()
+            (dired-hide-details-mode +1)))
+#+end_src
+
 * Configuring builtin stuff
+** Transparancy
+
+#+begin_src elisp
+(set-frame-parameter (selected-frame) 'alpha '(95 . 95))
+(add-to-list 'default-frame-alist '(alpha . (95 . 95)))
+(defun toggle-transparancy ()
+  (interactive)
+  (let ((alpha (frame-parameter nil 'alpha)))
+    (set-frame-parameter
+     nil 'alpha
+     (if (eql (cond ((numberp alpha) alpha)
+                    ((numberp (cdr alpha))(cdr alpha))
+                    ((numberp (cadr alpha)) (cadr alpha)))
+              100)
+         '(95. 95) '(100. 100)))))
+(global-set-key (kbd "C-c T") 'toggle-transparancy)
+#+end_src
 
 ** Org mode
 
@@ -53,6 +91,28 @@ Indentation messes code blocks
 (setq org-adapt-indentation nil)
 (setq org-edit-src-content-indentation 0)
 #+end_src
+
+Syntax Highlight in exported TeX
+
+#+begin_src elisp 
+(require 'org)
+(require 'ox-latex)
+(add-to-list 'org-latex-packages-alist '("" "minted"))
+(setq org-latex-listings 'minted) 
+
+(setq org-latex-pdf-process
+      '("pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
+        "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
+        "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"))
+
+(setq org-src-fontify-natively t)
+
+(org-babel-do-load-languages
+ 'org-babel-load-languages
+ '((R . t)
+   (latex . t)))
+#+end_src
+
 
 ** ElDoc
 
@@ -103,7 +163,8 @@ For org mode we want the following:
   (push '("#+end_quote" . ?») prettify-symbols-alist)
   (push '("*" . ?●) prettify-symbols-alist)
   (push '("**" . ?◉) prettify-symbols-alist)
-  (push '("***" . ?○) prettify-symbols-alist)))
+  (push '("***" . ?○) prettify-symbols-alist)
+  (push '("#+date:" . ?) prettify-symbols-alist)))
 #+end_src
 
 *** Haskell
@@ -114,61 +175,86 @@ We will replace sevral of the multi-characters operators and keywords
 (add-hook 'haskell-mode-hook
  (lambda ()
   (push '("/=" . ?≠) prettify-symbols-alist)
-  (push '("::" . ?⸬) prettify-symbols-alist)
   (push '("\\" . ?λ) prettify-symbols-alist)
   (push '("=>" . ?⇒) prettify-symbols-alist)
   (push '("->" . ?→) prettify-symbols-alist)))
 #+end_src
-    
+
 * Setup use for packages
+** straight.el
 
-** Require and initialize the package module
-
-Without it we can't do anything
+It is a better package manager that =package.el=.
 
 #+begin_src elisp
-(require 'package)
-(package-initialize)
+(setq straight-use-package-by-default t)
+(setq straight-vc-git-default-clone-depth 1)
+(defvar bootstrap-version)
+(let* ((straight-repo-dir
+        (expand-file-name "straight/repos" user-emacs-directory))
+       (bootstrap-file
+        (concat straight-repo-dir "/straight.el/bootstrap.el"))
+       (bootstrap-version 5))
+  (unless (file-exists-p bootstrap-file)
+    (shell-command
+     (concat
+      "mkdir -p " straight-repo-dir " && "
+      "git -C " straight-repo-dir " clone "
+      "https://github.com/raxod502/straight.el")))
+  (load bootstrap-file))
 #+end_src
 
-** Add MELPA to the archive list
+** use-package
 
-GNU ELPA is nice but clearly does not have everything we need
+use-package is a macro that allows for cleanner package configuration.
 
-#+begin_src elisp
-(add-to-list 'package-archives
- '("melpa" . "https://melpa.org/packages/") t)
+#+begin_src elisp 
+(straight-use-package 'use-package)
 #+end_src
 
-** =use-package=
+** Make the two work together
 
-This is a package that will allow us to more easily manage other packages
-   
-#+begin_src elisp
-(unless (package-installed-p 'use-package)
- (package-refresh-contents)
- (package-install 'use-package))
+#+begin_src elisp 
+(use-package straight
+  :custom (straight-use-package-by-default t))
 #+end_src
 
 * External Packages and their configuration
 ** Theme
 
-I use =doom-monokai-spectrum= from the =doom-themes= package
+I use =doom-gruvbox= from the =doom-themes= package
 
 #+begin_src elisp
 (use-package doom-themes
- :ensure t
  :config
- (load-theme 'doom-monokai-spectrum))
+ (load-theme 'doom-gruvbox))
  #+end_src
+** LSP support
+
+Language server protocols for a smarter Emacs
+
+#+begin_src elisp
+(use-package lsp-mode
+  :init
+  (setq lsp-keymap-prefix "C-c l")
+  :hook ((haskell-mode . lsp)
+         (haskell-literate-mode . lsp)
+         (c++-mode . lsp)
+         (c-mode . lsp)
+         (csharp-mode . lsp)
+         (lsp-mode . lsp-enable-which-key-integration))
+  :commands lsp)
+
+(use-package lsp-ui :commands lsp-ui-mode)
+(use-package lsp-ivy :commands lsp-ivy-workspace-symbol)
+#+end_src
+
 ** Autocompletion in mini-buffers
-   For this task I use =ivy= and =counsel=
+For this task I use =ivy= and =counsel=
 
 #+begin_src elisp
 (use-package counsel
- :ensure t
- :config
- (counsel-mode))
+  :config
+  (counsel-mode))
 #+end_src
    
 ** Autocompletion in files
@@ -177,9 +263,8 @@ I use =doom-monokai-spectrum= from the =doom-themes= package
     
 #+begin_src elisp
 (use-package company
- :ensure t
- :config
- (global-company-mode))
+  :config
+  (global-company-mode))
 #+end_src
 
 ** Git support
@@ -188,7 +273,6 @@ I use =doom-monokai-spectrum= from the =doom-themes= package
 
 #+begin_src elisp
 (use-package magit
- :ensure t
  :bind ("C-x g" . magit-status))
 #+end_src
 
@@ -198,8 +282,9 @@ I use =doom-monokai-spectrum= from the =doom-themes= package
 (use-package haskell-mode
  :bind
  (:map haskell-mode-map
-  ("<f8>" . haskell-navigate-imports))
- :ensure t)
+  ("<f8>" . haskell-navigate-imports)))
+
+(use-package lsp-haskell)
 #+end_src
 
 ** Projects
@@ -212,8 +297,7 @@ I use =doom-monokai-spectrum= from the =doom-themes= package
   (:map projectile-mode-map
         ("C-c p" . projectile-command-map))
   :init
-  (projectile-mode +1)
-  :ensure t)
+  (projectile-mode +1))
 #+end_src
 
 ** Keybinds popup
@@ -228,8 +312,7 @@ Emacs has loads of keybinds, you end up remembering those you use often but
   (add-to-list 'which-key-replacement-alist '(("TAB" . nil) . ("⇥" . nil)))
   (add-to-list 'which-key-replacement-alist '(("DEL" . nil) . ("⌫" . nil)))
   (add-to-list 'which-key-replacement-alist '(("RET" . nil) . ("↵" . nil)))
-  (add-to-list 'which-key-replacement-alist '(("SPC" . nil) . ("␣" . nil)))  
-  :ensure t)
+  (add-to-list 'which-key-replacement-alist '(("SPC" . nil) . ("␣" . nil))))
 #+end_src
 
 ** Markdown support
@@ -238,21 +321,11 @@ READMEs and more
 
 #+begin_src elisp
 (use-package markdown-mode
-  :ensure t
   :commands (markdown-mode gfm-mode)
   :mode (("README\\.md\\'" . gfm-mode)
          ("\\.md\\'" . markdown-mode)
          ("\\.markdown\\'" . markdown-mode))
   :init (setq markdown-command "multimarkdown"))
-#+end_src
-
-** Edit indirect
-
-Edit code blocks of outline documents in a dedicated buffer
-
-#+begin_src elisp
-(use-package edit-indirect
-  :ensure t)
 #+end_src
 
 ** Smart parenthesis
@@ -262,17 +335,17 @@ Auto closing parens, brackets, braces and more
 #+begin_src elisp
 (use-package smartparens
   :init
-  (smartparens-global-mode 1)
-  :ensure t)
+  (smartparens-global-mode 1))
 #+end_src
 
 ** TeX
+
+I do use LaTeX quite a bit.
 
 *** PDF Preview
 
 #+begin_src elisp
 (use-package pdf-tools
-  :ensure t
   :config
   (pdf-tools-install)
   (setq-default pdf-view-display-size 'fit-page)
@@ -283,8 +356,6 @@ Auto closing parens, brackets, braces and more
 
 #+begin_src elisp
 (use-package reftex
-  :ensure t
-  :defer t
   :config (setq reftex-cite-prompt-optional-args t))
 #+end_src
 
@@ -292,7 +363,6 @@ Auto closing parens, brackets, braces and more
 
 #+begin_src elisp
 (use-package company-auctex
-  :ensure t
   :init (company-auctex-init))
 #+end_src
 
@@ -300,7 +370,6 @@ Auto closing parens, brackets, braces and more
 
 #+begin_src elisp
 (use-package auctex-latexmk
-  :ensure t
   :config
   (auctex-latexmk-setup)
   (setq auctex-latexmk-inherit-TeX-PDF-mode t))
@@ -309,8 +378,7 @@ Auto closing parens, brackets, braces and more
 *** Everything else
 
 #+begin_src elisp
-(use-package tex
-  :ensure auctex
+(use-package auctex
   :mode ("\\.tex\\'" . latex-mode)
   :config (progn
             (setq TeX-source-correlate-mode t)
@@ -329,13 +397,131 @@ Auto closing parens, brackets, braces and more
                         (reftex-mode t)))))
 #+end_src
 
-** Lua
+** Lua and moonscript
 
 Lua developement. I do a whole bunch of that
 
 #+begin_src elisp
 (use-package lua-mode
-  :ensure t
   :config
   (setq lua-indent-level 4))
+#+end_src
+
+I also use moonscript
+
+#+begin_src elisp
+(use-package moonscript)
+#+end_src
+
+** Music
+
+#+begin_src elisp
+(use-package emms
+  :config
+  (require 'emms-setup)
+  (emms-all)
+  (emms-default-players)
+  (setq emms-source-file-default-directory "~/Music/"))
+#+end_src
+
+** Terminal
+
+#+begin_src elisp
+(use-package vterm
+  :bind
+  ("C-c t" . vterm))
+#+end_src
+
+** Unclutter the modeline
+
+#+begin_src elisp
+(use-package delight
+  :config
+  (delight '((smartparens-mode nil smartparens)
+             (which-key-mode nil which-key)
+             (counsel-mode nil counsel)
+             (company-mode nil company)
+             (c++-mode "C++" cc-mode)
+             (projectile-mode " P" projectile)
+             (emacs-lisp-mode "Elisp" :major)
+             (eldoc-mode nil "eldoc")
+             (overwrite-mode " Ov" "simple")
+             (yas-minor-mode " y" yasnippet)
+             (yas-global-mode " y" yasnippet)
+             (emms-playlist-mode "♫" emms)
+             (undo-tree-mode nil undo-tree))))
+#+end_src
+ 
+** YAML support
+
+#+begin_src elisp
+(use-package yaml-mode
+  :bind
+  (:map yaml-mode-map
+        ("RET" . newline-and-indent)))
+#+end_src
+
+** Fish Shell
+
+It is my main shell, so I need to have emacs supporting it
+
+#+begin_src elisp
+(use-package fish-mode)
+#+end_src
+
+** Enable snippets in all environements
+
+#+begin_src elisp
+(require 'yasnippet)
+(yas-global-mode +1)
+
+(use-package yasnippet-snippets)
+#+end_src
+
+** Undo tree
+
+#+begin_src elisp 
+(use-package undo-tree
+   :config
+ (global-undo-tree-mode +1))
+#+end_src
+
+** Lean prover
+
+#+begin_src elisp
+(use-package lean4-mode
+  :straight (lean4-mode :type git :host github :repo "leanprover/lean4"
+             :files ("lean4-mode/lean4*.el"))
+  ;; to defer loading the package until required
+  :commands (lean4-mode))
+#+end_src
+
+** Javascript
+
+#+begin_src elisp 
+(use-package coffee-mode)
+(use-package js2-mode)
+(use-package rjsx-mode)
+(use-package typescript-mode)
+(use-package js2-refactor
+  :hook (js2-mode-hook . js2-refactor-mode)
+  :config
+  (js2r-add-keybindings-with-prefix "C-c C-m"))
+(use-package npm-mode)
+#+end_src
+
+** Icons in dired
+#+begin_src elisp 
+(use-package dired-icon
+  :config
+  (add-hook 'dired-mode-hook 'dired-icon-mode))
+#+end_src
+
+** Web stuff
+
+#+begin_src elisp
+(use-package web-mode)
+(use-package company-web
+  :config
+  (define-key web-mode-map (kbd "C-'") 'company-web-html))
 #+end_src
